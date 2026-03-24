@@ -1,0 +1,53 @@
+package net.borisshoes.pulse_fabric.config.values;
+
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import net.borisshoes.pulse_fabric.config.ConfigValue;
+import net.minecraft.commands.CommandSourceStack;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+
+public class BooleanConfigValue extends ConfigValue<Boolean> {
+   protected final boolean defaultValue;
+   
+   public BooleanConfigValue(@NotNull String name, boolean defaultValue){
+      super(name, defaultValue);
+      this.defaultValue = defaultValue;
+   }
+   
+   @Override
+   public Boolean getFromString(String value){
+      return Boolean.parseBoolean(value);
+   }
+   
+   @Override
+   public ArgumentType<Boolean> getArgumentType(){
+      return BoolArgumentType.bool();
+   }
+   
+   @Override
+   public Boolean parseArgumentValue(CommandContext<CommandSourceStack> ctx){
+      return BoolArgumentType.getBool(ctx, name);
+   }
+   
+   public CompletableFuture<Suggestions> getSuggestions(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder){
+      Set<String> options = new HashSet<>();
+      options.add("true");
+      options.add("false");
+      String start = builder.getRemaining().toLowerCase(Locale.ROOT);
+      options.stream().filter(s -> s.toLowerCase(Locale.ROOT).startsWith(start)).forEach(builder::suggest);
+      return builder.buildFuture();
+   }
+   
+   @Override
+   public String getValueString(){
+      return String.valueOf(this.value != null ? this.value : this.defaultValue);
+   }
+}

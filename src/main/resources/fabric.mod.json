@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "pulse-fabric",
+  "version": "${version}",
+  "name": "Pulse Fabric",
+  "description": "The heartbeat of high-performance Minecraft networking, in Fabric form!",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/pulse-fabric/icon.png",
+  "environment": "*",
+  "accessWidener": "pulse-fabric.accesswidener",
+  "entrypoints": {
+    "client": [
+      "net.borisshoes.pulse_fabric.PulseFabric"
+    ],
+    "main": [
+      "net.borisshoes.pulse_fabric.PulseFabric"
+    ]
+  },
+  "mixins": [
+    "pulse-fabric.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
