@@ -1,25 +1,25 @@
 {
   "schemaVersion": 1,
-  "id": "pulse-fabric",
+  "id": "pulsenet",
   "version": "${version}",
-  "name": "Pulse Fabric",
+  "name": "PulseNet",
   "description": "The heartbeat of high-performance Minecraft networking, in Fabric form!",
   "authors": [],
   "contact": {},
   "license": "All-Rights-Reserved",
-  "icon": "assets/pulse-fabric/icon.png",
+  "icon": "assets/pulsenet/icon.png",
   "environment": "*",
-  "accessWidener": "pulse-fabric.accesswidener",
+  "accessWidener": "pulsenet.accesswidener",
   "entrypoints": {
     "client": [
-      "net.borisshoes.pulse_fabric.PulseFabric"
+      "dev.pulsemc.pulsenet.PulseNet"
     ],
     "main": [
-      "net.borisshoes.pulse_fabric.PulseFabric"
+      "dev.pulsemc.pulsenet.PulseNet"
     ]
   },
   "mixins": [
-    "pulse-fabric.mixins.json"
+    "pulsenet.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=${loader_version}",
