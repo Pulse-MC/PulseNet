@@ -4,7 +4,6 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.netty.channel.ChannelFutureListener;
 import dev.pulsemc.pulsenet.PulseNet;
-import dev.pulsemc.pulsenet.network.FlushReason;
 import dev.pulsemc.pulsenet.network.PacketBuffer;
 import dev.pulsemc.pulsenet.network.PacketBufferAccess;
 import net.minecraft.network.Connection;
@@ -60,11 +59,6 @@ public abstract class ServerCommonPacketListenerImplMixin implements PacketBuffe
       // When batching is enabled, delegate to the PacketBuffer for flush control
       if(pulsenet$buffer != null && PulseNet.CONFIG != null && PulseNet.CONFIG.getBoolean(PulseNet.BATCHING_ENABLED)){
          pulsenet$buffer.handleOutgoingPacket(packet, listener, flush, original, connection);
-         
-         // Handle terminal packets
-         if(packet.isTerminal()){
-            pulsenet$buffer.flush(FlushReason.INSTANT);
-         }
          return;
       }
       
@@ -78,4 +72,5 @@ public abstract class ServerCommonPacketListenerImplMixin implements PacketBuffe
          pulsenet$buffer.cleanup();
       }
    }
+   
 }

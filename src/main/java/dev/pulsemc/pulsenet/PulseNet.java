@@ -46,6 +46,10 @@ public class PulseNet implements ModInitializer, ClientModInitializer {
                new StringConfigValue("", ""))));
    public static final IConfigSetting<?> BATCHING_IGNORED_PACKETS = registerConfigSetting(new ConfigSetting<>(
          new ListConfigValue<>("batchingIgnoredPackets", List.of(), new StringConfigValue("", ""))));
+   public static final IConfigSetting<?> BATCHING_INSTANT_CHANNELS = registerConfigSetting(new ConfigSetting<>(
+         new ListConfigValue<>("batchingInstantChannels", List.of(), new StringConfigValue("", ""))));
+   public static final IConfigSetting<?> BATCHING_IGNORED_CHANNELS = registerConfigSetting(new ConfigSetting<>(
+         new ListConfigValue<>("batchingIgnoredChannels", List.of(), new StringConfigValue("", ""))));
    public static final IConfigSetting<?> BATCHING_CHAT_BYPASS = registerConfigSetting(new ConfigSetting<>(
          new BooleanConfigValue("batchingChatPacketsBypass", true)));
    public static final IConfigSetting<?> BATCHING_OFF_THREAD_BYPASS = registerConfigSetting(new ConfigSetting<>(

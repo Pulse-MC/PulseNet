@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/banner.png" alt="PulseNet Banner" width="100%">
+<img src="https://github.com/Pulse-MC/PulseNet/blob/main/assets/banner.png?raw=true" alt="PulseNet Banner" width="100%">
 
 # PulseNet
 ### The Heartbeat of High-Performance Networking - Fabric Edition
@@ -9,7 +9,6 @@
 
 [![Website](https://img.shields.io/badge/Website-pulsemc.dev-333333?style=for-the-badge&logo=google-chrome&logoColor=007bff)](https://pulsemc.dev)
 [![Discord](https://img.shields.io/discord/1458504248215212145.svg?label=&logo=discord&logoColor=ffffff&color=403e3e&labelColor=5865F2&style=for-the-badge)](https://dsc.gg/Pulse-MC)
-[![Documentation](https://img.shields.io/badge/Java-Docs-333333?style=for-the-badge&logo=openjdk&logoColor=white&labelColor=ED8B00)](https://jd.pulsemc.dev)
 
 </div>
 
@@ -29,8 +28,7 @@ PulseNet is a server-side Fabric mod. Drop it into your `mods/` folder alongside
 * Minecraft 26.1+
 * Java 25+
 
-[//]: # (* Documentation: [docs.pulsemc.dev]&#40;https://docs.pulsemc.dev&#41;)
-* Latest Builds: [pulsemc.dev/releases](https://pulsemc.dev)
+* Latest Builds: [https://modrinth.com/mod/pulsenet](https://modrinth.com/mod/pulsenet)
 
 ---
 
@@ -42,7 +40,7 @@ PulseNet is a server-side Fabric mod. Drop it into your `mods/` folder alongside
 | **Write Queue** | Replaces per-packet event loop task submissions with a single batched write task, eliminating lambda allocations and cross-thread scheduling overhead. |
 | **Packet Coalescing** | Bundles similar low-priority packets (particles, sounds) into `BundlePacket`s, reducing the client's received packet count. |
 | **Explosion Optimization** | Detects mass block changes from explosions and replaces individual block update packets with a full chunk resend when a configurable threshold is exceeded. |
-| **Packet Classification** | Automatically classifies packets as Critical, Instant, Chat, Ignored, or Coalesce — ensuring latency-sensitive packets (keepalive, disconnect, combat) always bypass the buffer. |
+| **Packet Classification** | Automatically classifies packets as Critical, Instant, Chat, Ignored, or Coalesce — ensuring latency-sensitive packets (keepalive, disconnect, combat) always bypass the buffer. Fabric infrastructure packets (`minecraft:register`, `minecraft:unregister`) are handled at the Connection level to prevent mod handshake failures. |
 | **Real-Time Metrics** | Built-in metrics system tracking logical/physical PPS, bandwidth, CPU usage, memory savings, and write queue efficiency. Viewable via commands or an in-game boss bar. |
 | **Mixin Compatibility** | Uses a `@WrapOperation` approach that runs *after* all other mixins (Polymer, server-side translations, etc.), ensuring full compatibility with the Fabric mod ecosystem. |
 | **Hot-Reloadable Config** | All settings are configurable via `pulse.properties` and in-game commands (`/pulse config`, `/pulse reload`) with no restart required. |
@@ -59,6 +57,10 @@ PulseNet is a server-side Fabric mod. Drop it into your `mods/` folder alongside
 | `/pulse netstats [network\|cpu\|ram\|all]` | Displays real-time network, CPU, and memory statistics. |
 | `/pulse netstats bar`                      | Toggles the metrics boss bar overlay.                   |
 | `/pulse netstats reset`                    | Resets all metrics counters to zero.                    |
+| `/pulse packetNames`                       | Lists all observed packet class names and channel IDs.  |
+| `/pulse packetNames classes`               | Lists only observed packet class names.                 |
+| `/pulse packetNames channels`              | Lists only observed custom payload channel IDs.         |
+| `/pulse packetNames reset`                 | Clears the observed packet name lists.                  |
 
 ### Config Commands
 The following commands can be used to adjust configurable settings in the `pulse.properties` file without a server reboot (Use `/pulse reload` after running these commands to hotswap changes). These commands can be suffixed with a value to set the setting, or used without a value to view the current setting.
@@ -70,6 +72,8 @@ The following commands can be used to adjust configurable settings in the `pulse
 * `/pulse config batchingSafetyMarginBytes` Safety margin in bytes subtracted from the max batch bytes limit to prevent overflow. (default: 64)
 * `/pulse config batchingInstantPackets` List of packet class names that should flush the buffer immediately when sent. (default: ClientboundHurtAnimationPacket, ClientboundDamageEventPacket, ClientboundBlockEntityDataPacket)
 * `/pulse config batchingIgnoredPackets` List of packet class names that should always bypass the buffer entirely. (default: [])
+* `/pulse config batchingInstantChannels` List of plugin channel IDs (e.g. `axiom:hello`) whose custom payload packets should flush the buffer immediately when sent. Use `/pulse packetNames channels` to discover channel IDs. (default: [])
+* `/pulse config batchingIgnoredChannels` List of plugin channel IDs whose custom payload packets should always bypass the buffer entirely. Use `/pulse packetNames channels` to discover channel IDs. Note: `minecraft:register` and `minecraft:unregister` are handled at the Connection level and always bypass the buffer regardless of this list. (default: [])
 * `/pulse config batchingChatPacketsBypass` When true, chat-related packets bypass the buffer for instant delivery. (default: true)
 * `/pulse config batchingOffThreadBypass` When true, packets sent from off the server thread bypass the buffer. (default: true)
 * `/pulse config batchingWriteQueue` When true, buffered packets are queued and written in a single event loop task instead of calling Connection.send() per packet, eliminating per-packet lambda allocations and cross-thread task scheduling. (default: true)
@@ -99,6 +103,7 @@ PulseNet uses the [Fabric Permissions API](https://github.com/lucko/fabric-permi
 | `pulsenet.netstats` | `GAMEMASTERS` | View network, CPU, and memory statistics |
 | `pulsenet.netstats.bar` | `GAMEMASTERS` | Toggle the metrics boss bar overlay |
 | `pulsenet.netstats.reset` | `GAMEMASTERS` | Reset all metrics counters to zero |
+| `pulsenet.packetnames` | `GAMEMASTERS` | List observed packet class names and channel IDs |
 
 ### Config
 Config commands are generated dynamically per config value. The `<name>` below corresponds to the camelCase config key (e.g. `batchingEnabled`, `metricsUpdateInterval`).

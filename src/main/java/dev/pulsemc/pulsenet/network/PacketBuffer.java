@@ -8,6 +8,8 @@ import dev.pulsemc.pulsenet.mixins.SectionBlocksUpdatePacketAccessor;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.BundlePacket;
 import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.game.*;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -75,6 +77,10 @@ public class PacketBuffer {
    private volatile int cachedBundleLimit;
    private volatile BatchingMode cachedBatchingMode;
    
+   // Per-connection channel-ID bypass sets (rebuilt on refreshConfig)
+   private volatile Set<String> cachedInstantChannels = Set.of();
+   private volatile Set<String> cachedIgnoredChannels = Set.of();
+   
    // Interval mode scheduler
    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
       Thread t = new Thread(r, "pulse-interval-flusher");
@@ -98,6 +104,21 @@ public class PacketBuffer {
    
    // Active buffer registry for config reload propagation
    private static final Set<PacketBuffer> activeBuffers = ConcurrentHashMap.newKeySet();
+   
+   // Observed packet types — populated at runtime, read by /pulse packetNames
+   private static final Set<String> observedClassNames = ConcurrentHashMap.newKeySet();
+   private static final Set<String> observedChannelIds = ConcurrentHashMap.newKeySet();
+   
+   // Fabric/Minecraft infrastructure channels that must ALWAYS bypass the buffer.
+   // These channel-registration packets (minecraft:register / minecraft:unregister)
+   // are primarily handled by ConnectionMixin (which flushes the buffer before Fabric
+   // sends them via connection.send()). This check is a secondary safety net for the
+   // unlikely case that some mod sends channel registration through
+   // ServerCommonPacketListenerImpl.send() instead.
+   private static final Set<String> INFRASTRUCTURE_CHANNELS = Set.of(
+         "minecraft:register",
+         "minecraft:unregister"
+   );
    
    private record PacketEntry(Packet<?> packet, @Nullable ChannelFutureListener listener) {
    }
@@ -132,6 +153,8 @@ public class PacketBuffer {
          cachedPacketCoalescing = true;
          cachedBundleLimit = 4000;
          cachedBatchingMode = BatchingMode.SMART_EXECUTION;
+         cachedInstantChannels = Set.of();
+         cachedIgnoredChannels = Set.of();
          return;
       }
       cachedBatchingEnabled = PulseNet.CONFIG.getBoolean(PulseNet.BATCHING_ENABLED);
@@ -149,6 +172,17 @@ public class PacketBuffer {
       cachedBundleLimit = PulseNet.CONFIG.getInt(PulseNet.BATCHING_COALESCE_BUNDLE_LIMIT);
       Object modeVal = PulseNet.CONFIG.getValue(PulseNet.BATCHING_MODE);
       cachedBatchingMode = modeVal instanceof BatchingMode mode ? mode : BatchingMode.SMART_EXECUTION;
+      
+      // Build channel-ID bypass sets
+      Set<String> instantChSet = new HashSet<>();
+      Object icObj = PulseNet.CONFIG.getValue(PulseNet.BATCHING_INSTANT_CHANNELS);
+      if(icObj instanceof List<?> icList) for(Object o : icList) instantChSet.add(o.toString());
+      cachedInstantChannels = Set.copyOf(instantChSet);
+      
+      Set<String> ignoredChSet = new HashSet<>();
+      Object igObj = PulseNet.CONFIG.getValue(PulseNet.BATCHING_IGNORED_CHANNELS);
+      if(igObj instanceof List<?> igList) for(Object o : igList) ignoredChSet.add(o.toString());
+      cachedIgnoredChannels = Set.copyOf(ignoredChSet);
    }
    
    // ─── Packet class resolution ────────────────────────────────────────
@@ -314,19 +348,64 @@ public class PacketBuffer {
          return;
       }
       
+      // Terminal packets trigger protocol transitions (e.g. ClientboundStartConfigurationPacket
+      // pushes the client from PLAY back to CONFIG). These MUST be sent AFTER all preceding
+      // buffered data, not batched together with it. In MC 26.1's CONFIG→PLAY→CONFIG flow,
+      // if the config transition is buried inside a large batch of chunks/entities, the client
+      // spends seconds processing the batch before it even sees the transition — breaking mods
+      // with timing-sensitive handshakes (e.g. Axiom's one-shot hasJoined window).
+      // Flush the buffer first, THEN send the terminal packet individually.
+      if(packet.isTerminal()){
+         flush(FlushReason.INSTANT);
+         original.call(connection, packet, listener, true);
+         return;
+      }
+      
       // Off-thread packets → send with flush
       if(cachedOffThreadBypass && !server.isSameThread()){
          original.call(connection, packet, listener, flush);
          return;
       }
       
-      // Not in GAME state yet (login/config phase) → don't buffer
-      if(!(this.listener instanceof ServerGamePacketListenerImpl)){
-         original.call(connection, packet, listener, flush);
-         return;
-      }
-      
-      // Single map lookup for packet classification
+       // Not in GAME state yet (login/config phase) → don't buffer
+       if(!(this.listener instanceof ServerGamePacketListenerImpl)){
+          original.call(connection, packet, listener, flush);
+          return;
+       }
+       
+       // ─── Track observed packet types (feeds /pulse packetNames) ──────
+       observedClassNames.add(packet.getClass().getSimpleName());
+       if(packet instanceof ClientboundCustomPayloadPacket(CustomPacketPayload payload)){
+          String channelId = payload.type().id().toString();
+          observedChannelIds.add(channelId);
+          
+          // Fabric/Minecraft infrastructure channels — always flush immediately.
+          // minecraft:register must reach the client before its first tick or all
+          // ServerPlayNetworking-based mod handshakes fail via a one-shot race condition.
+          if(INFRASTRUCTURE_CHANNELS.contains(channelId)){
+             Metrics.logicalCounter.incrementAndGet();
+             flush(FlushReason.INSTANT);
+             original.call(connection, packet, listener, true);
+             Metrics.physicalCounter.incrementAndGet();
+             return;
+          }
+          
+          // Channel-specific instant bypass — user-configured via batchingInstantChannels
+          if(cachedInstantChannels.contains(channelId)){
+             Metrics.logicalCounter.incrementAndGet();
+             flush(FlushReason.INSTANT);
+             original.call(connection, packet, listener, true);
+             Metrics.physicalCounter.incrementAndGet();
+             return;
+          }
+          // Channel-specific ignored bypass — user-configured via batchingIgnoredChannels
+          if(cachedIgnoredChannels.contains(channelId)){
+             original.call(connection, packet, listener, flush);
+             return;
+          }
+       }
+       
+       // Single map lookup for packet classification
       PacketAction action = packetClassification.get(packet.getClass());
       if(action != null){
          switch(action){
@@ -625,6 +704,24 @@ public class PacketBuffer {
          buffer.refreshConfig();
          buffer.setupIntervalTask();
       }
+   }
+   
+   // ─── Packet name observation (feeds /pulse packetNames) ─────────────
+   
+   /** Returns a sorted snapshot of every packet class simple-name seen since last reset. */
+   public static Set<String> getObservedClassNames(){
+      return new TreeSet<>(observedClassNames);
+   }
+   
+   /** Returns a sorted snapshot of every custom-payload channel ID seen since last reset. */
+   public static Set<String> getObservedChannelIds(){
+      return new TreeSet<>(observedChannelIds);
+   }
+   
+   /** Clears both observation sets (used by /pulse packetNames reset). */
+   public static void clearObservedPackets(){
+      observedClassNames.clear();
+      observedChannelIds.clear();
    }
 }
 

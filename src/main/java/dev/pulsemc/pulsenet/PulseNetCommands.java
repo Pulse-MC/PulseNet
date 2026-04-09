@@ -17,6 +17,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.PermissionLevel;
 
 import java.util.Locale;
+import java.util.Set;
 
 import static com.mojang.brigadier.arguments.StringArgumentType.*;
 import static net.minecraft.commands.Commands.argument;
@@ -40,15 +41,24 @@ public class PulseNetCommands {
                   .then(literal("reset")
                         .requires(Permissions.require(PulseNet.MOD_ID + ".netstats.reset", PermissionLevel.GAMEMASTERS))
                         .executes(PulseNetCommands::resetStats))
-                  .then(argument("type", word())
-                        .suggests((ctx, builder) -> {
-                           builder.suggest("network");
-                           builder.suggest("cpu");
-                           builder.suggest("ram");
-                           builder.suggest("all");
-                           return builder.buildFuture();
-                        })
-                        .executes(ctx -> sendStats(ctx, getString(ctx, "type")))))
+                   .then(argument("type", word())
+                         .suggests((ctx, builder) -> {
+                            builder.suggest("network");
+                            builder.suggest("cpu");
+                            builder.suggest("ram");
+                            builder.suggest("all");
+                            return builder.buildFuture();
+                         })
+                         .executes(ctx -> sendStats(ctx, getString(ctx, "type")))))
+            .then(literal("packetNames")
+                  .requires(Permissions.require(PulseNet.MOD_ID + ".packetnames", PermissionLevel.GAMEMASTERS))
+                  .executes(PulseNetCommands::listAllPacketNames)
+                  .then(literal("classes")
+                        .executes(PulseNetCommands::listPacketClasses))
+                  .then(literal("channels")
+                        .executes(PulseNetCommands::listPacketChannels))
+                  .then(literal("reset")
+                        .executes(PulseNetCommands::resetPacketNames)))
       );
       dispatcher.register(PulseNet.CONFIG.generateCommand("pulse","config"));
    }
@@ -160,6 +170,50 @@ public class PulseNetCommands {
    private static int resetStats(CommandContext<CommandSourceStack> context){
       Metrics.reset();
       context.getSource().sendSuccess(() -> Component.translatable("command.pulsenet.netstats.reset.success").withStyle(ChatFormatting.GREEN), true);
+      return 1;
+   }
+   
+   // ─── Packet Name Observation Commands ───────────────────────────────
+   
+   private static int listAllPacketNames(CommandContext<CommandSourceStack> context){
+      listPacketClasses(context);
+      listPacketChannels(context);
+      return 1;
+   }
+   
+   private static int listPacketClasses(CommandContext<CommandSourceStack> context){
+      Set<String> names = PacketBuffer.getObservedClassNames();
+      context.getSource().sendSuccess(() -> Component.translatable("command.pulsenet.packetnames.header_classes").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
+      context.getSource().sendSuccess(() -> Component.translatable("command.pulsenet.packetnames.count", names.size()).withStyle(ChatFormatting.GRAY), false);
+      if(names.isEmpty()){
+         context.getSource().sendSuccess(() -> Component.translatable("command.pulsenet.packetnames.empty").withStyle(ChatFormatting.DARK_GRAY), false);
+      }else{
+         for(String name : names){
+            context.getSource().sendSuccess(() -> Component.literal("  " + name).withStyle(ChatFormatting.WHITE), false);
+         }
+      }
+      context.getSource().sendSuccess(() -> Component.translatable("command.pulsenet.packetnames.hint_classes").withStyle(ChatFormatting.DARK_AQUA), false);
+      return 1;
+   }
+   
+   private static int listPacketChannels(CommandContext<CommandSourceStack> context){
+      Set<String> channels = PacketBuffer.getObservedChannelIds();
+      context.getSource().sendSuccess(() -> Component.translatable("command.pulsenet.packetnames.header_channels").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
+      context.getSource().sendSuccess(() -> Component.translatable("command.pulsenet.packetnames.count", channels.size()).withStyle(ChatFormatting.GRAY), false);
+      if(channels.isEmpty()){
+         context.getSource().sendSuccess(() -> Component.translatable("command.pulsenet.packetnames.empty").withStyle(ChatFormatting.DARK_GRAY), false);
+      }else{
+         for(String channel : channels){
+            context.getSource().sendSuccess(() -> Component.literal("  " + channel).withStyle(ChatFormatting.WHITE), false);
+         }
+      }
+      context.getSource().sendSuccess(() -> Component.translatable("command.pulsenet.packetnames.hint_channels").withStyle(ChatFormatting.DARK_AQUA), false);
+      return 1;
+   }
+   
+   private static int resetPacketNames(CommandContext<CommandSourceStack> context){
+      PacketBuffer.clearObservedPackets();
+      context.getSource().sendSuccess(() -> Component.translatable("command.pulsenet.packetnames.reset").withStyle(ChatFormatting.GREEN), true);
       return 1;
    }
 }
