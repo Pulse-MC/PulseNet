@@ -24,6 +24,12 @@
   "depends": {
     "fabricloader": ">=${loader_version}",
     "fabric-api": "*",
-    "minecraft": ">=${minecraft_version}"
+    "minecraft": "~${minecraft_version}"
+  },
+  "custom": {
+    "mc-publish": {
+      "modrinth": "C5TrjUEt",
+      "curseforge": 1578175
+    }
   }
 }
